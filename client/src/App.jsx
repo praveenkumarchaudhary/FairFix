@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './context/AuthContext';
 import Navbar from './components/Navbar';
+import ChatBot from './components/ChatBot';
 import Home from './pages/Home';
 import PricePredict from './pages/PricePredict';
 import ShopFinder from './pages/ShopFinder';
@@ -30,6 +31,7 @@ export default function App() {
             error: { iconTheme: { primary: 'var(--danger)', secondary: 'white' } },
           }}
         />
+        <ChatBot />
       </BrowserRouter>
     </AuthProvider>
   );
