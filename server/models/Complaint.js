@@ -14,6 +14,7 @@ const complaintSchema = new mongoose.Schema({
   amountCharged: Number,
   fairPrice: Number,
   status: { type: String, enum: ['pending', 'reviewed', 'resolved'], default: 'pending' },
+  proofImages: [{ filename: String, originalName: String, url: String }],
   createdAt: { type: Date, default: Date.now }
 });
 
