@@ -26,7 +26,6 @@ export default function Navbar() {
     { to: '/', label: 'Home' },
     { to: '/predict', label: 'Price Check' },
     { to: '/shops', label: 'Find Shops' },
-    { to: '/complaints', label: 'Complaints' },
     { to: '/ai', label: '🤖 AI Features' },
   ];
 

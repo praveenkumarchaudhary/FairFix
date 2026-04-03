@@ -144,7 +144,7 @@ export default function ShopDetail() {
                     <span style={{ fontWeight: 600, textTransform: 'capitalize' }}>{s.device}</span>
                     <span style={{ color: 'var(--text2)', marginLeft: 8, textTransform: 'capitalize' }}>— {s.issue}</span>
                   </div>
-                  <span style={{ fontWeight: 700, color: 'var(--secondary)', fontSize: 16 }}>${s.price}</span>
+                  <span style={{ fontWeight: 700, color: 'var(--secondary)', fontSize: 16 }}>₹{s.price.toLocaleString('en-IN')}</span>
                 </div>
               ))}
             </div>
@@ -183,7 +183,7 @@ export default function ShopDetail() {
                   </div>
                   <p style={{ fontSize: 14, color: 'var(--text2)', lineHeight: 1.5 }}>{review.comment}</p>
                   {review.pricePaid && (
-                    <div style={{ fontSize: 12, color: 'var(--secondary)', marginTop: 6 }}>Paid: ${review.pricePaid}</div>
+                    <div style={{ fontSize: 12, color: 'var(--secondary)', marginTop: 6 }}>Paid: ₹{review.pricePaid.toLocaleString('en-IN')}</div>
                   )}
                 </div>
               ))}
