@@ -17,6 +17,7 @@ app.use('/api/complaints', require('./routes/complaints'));
 app.use('/api/reviews', require('./routes/reviews'));
 app.use('/api/pricing', require('./routes/pricing'));
 app.use('/api/chat', require('./routes/chat'));
+app.use('/api/ai', require('./routes/ai'));
 
 // Connect to MongoDB
 mongoose.connect(process.env.MONGO_URI)
