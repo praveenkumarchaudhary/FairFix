@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Shop = require('../models/Shop');
 
-// Haversine distance formula
+// Haversine distance
 function getDistance(lat1, lng1, lat2, lng2) {
   const R = 6371;
   const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -11,25 +11,33 @@ function getDistance(lat1, lng1, lat2, lng2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-// Get all shops with optional location filter
+// GET /shops?district=Amritsar&sort=rating
 router.get('/', async (req, res) => {
   try {
-    const { lat, lng, radius = 20, sort = 'distance', city } = req.query;
-    let shops = await Shop.find(city ? { city: new RegExp(city, 'i') } : {});
+    const { district, lat, lng, radius = 500, sort = 'rating', city } = req.query;
 
+    // Build filter — district takes priority
+    const filter = {};
+    if (district) filter.district = new RegExp(district, 'i');
+    else if (city) filter.city = new RegExp(city, 'i');
+
+    let shops = await Shop.find(filter);
+
+    // Attach distance if coords provided
     if (lat && lng) {
-      shops = shops.map(shop => ({
-        ...shop.toObject(),
-        distance: parseFloat(getDistance(parseFloat(lat), parseFloat(lng), shop.location.lat, shop.location.lng).toFixed(1))
+      shops = shops.map(s => ({
+        ...s.toObject(),
+        distance: parseFloat(getDistance(parseFloat(lat), parseFloat(lng), s.location.lat, s.location.lng).toFixed(1))
       })).filter(s => s.distance <= parseFloat(radius));
     } else {
       shops = shops.map(s => ({ ...s.toObject(), distance: null }));
     }
 
+    // Sort
     if (sort === 'distance' && lat) shops.sort((a, b) => a.distance - b.distance);
-    else if (sort === 'rating') shops.sort((a, b) => b.rating - a.rating);
-    else if (sort === 'trust') shops.sort((a, b) => b.trustScore - a.trustScore);
-    else if (sort === 'price') shops.sort((a, b) => (a.priceRange === 'budget' ? -1 : 1));
+    else if (sort === 'rating')    shops.sort((a, b) => b.rating - a.rating);
+    else if (sort === 'trust')     shops.sort((a, b) => b.trustScore - a.trustScore);
+    else if (sort === 'price')     shops.sort((a, b) => (a.priceRange === 'budget' ? -1 : 1));
 
     res.json(shops);
   } catch (err) {
@@ -37,7 +45,7 @@ router.get('/', async (req, res) => {
   }
 });
 
-// Get single shop
+// GET /shops/:id
 router.get('/:id', async (req, res) => {
   try {
     const shop = await Shop.findById(req.params.id);
@@ -48,68 +56,64 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// Seed demo shops — all Punjab districts
+// POST /shops/seed — Punjab, India districts
 router.post('/seed', async (req, res) => {
   try {
     await Shop.deleteMany({});
     const shops = [
-      // Lahore
-      { name: 'TechFix Pro Lahore',      address: 'Mall Road',          city: 'Lahore',         phone: '042-1110001', location: { lat: 31.5204, lng: 74.3587 }, rating: 4.8, reviewCount: 312, trustScore: 96, isFairPriceBadge: true,  specialties: ['smartphone','laptop','tablet'], priceRange: 'mid',     services: [{ device: 'smartphone', issue: 'screen', price: 3500 }, { device: 'laptop', issue: 'screen', price: 8000 }] },
-      { name: 'iRepair Lahore',           address: 'Gulberg III',        city: 'Lahore',         phone: '042-1110002', location: { lat: 31.5100, lng: 74.3400 }, rating: 4.5, reviewCount: 198, trustScore: 89, isFairPriceBadge: true,  specialties: ['smartphone','tablet'],         priceRange: 'mid',     services: [{ device: 'smartphone', issue: 'battery', price: 1800 }] },
-      { name: 'Quick Mobile Lahore',      address: 'Liberty Market',     city: 'Lahore',         phone: '042-1110003', location: { lat: 31.5250, lng: 74.3450 }, rating: 3.7, reviewCount: 87,  trustScore: 62, isFairPriceBadge: false, isFlagged: true, specialties: ['smartphone'], priceRange: 'premium', services: [{ device: 'smartphone', issue: 'screen', price: 6500 }] },
-      // Faisalabad
-      { name: 'Faisalabad Tech Hub',      address: 'D Ground',           city: 'Faisalabad',     phone: '041-2220001', location: { lat: 31.4504, lng: 73.1350 }, rating: 4.4, reviewCount: 145, trustScore: 88, isFairPriceBadge: true,  specialties: ['smartphone','laptop'],         priceRange: 'mid',     services: [{ device: 'smartphone', issue: 'screen', price: 3200 }, { device: 'laptop', issue: 'battery', price: 4500 }] },
-      { name: 'Mobile Care Faisalabad',   address: 'Kohinoor City',      city: 'Faisalabad',     phone: '041-2220002', location: { lat: 31.4600, lng: 73.1200 }, rating: 4.1, reviewCount: 92,  trustScore: 80, isFairPriceBadge: true,  specialties: ['smartphone'],                  priceRange: 'budget',  services: [{ device: 'smartphone', issue: 'battery', price: 1500 }] },
-      // Rawalpindi
-      { name: 'Pindi Gadget Repair',      address: 'Saddar Bazar',       city: 'Rawalpindi',     phone: '051-3330001', location: { lat: 33.5651, lng: 73.0169 }, rating: 4.6, reviewCount: 221, trustScore: 93, isFairPriceBadge: true,  specialties: ['smartphone','laptop','tablet'], priceRange: 'mid',     services: [{ device: 'smartphone', issue: 'screen', price: 3800 }, { device: 'laptop', issue: 'screen', price: 9000 }] },
-      { name: 'Tech Zone Rawalpindi',     address: 'Raja Bazar',         city: 'Rawalpindi',     phone: '051-3330002', location: { lat: 33.5700, lng: 73.0250 }, rating: 3.9, reviewCount: 64,  trustScore: 70, isFairPriceBadge: false, specialties: ['smartphone'],                  priceRange: 'budget',  services: [{ device: 'smartphone', issue: 'charging_port', price: 900 }] },
-      // Gujranwala
-      { name: 'Gujranwala Mobile Fix',    address: 'GT Road',            city: 'Gujranwala',     phone: '055-4440001', location: { lat: 32.1877, lng: 74.1945 }, rating: 4.3, reviewCount: 118, trustScore: 85, isFairPriceBadge: true,  specialties: ['smartphone','laptop'],         priceRange: 'mid',     services: [{ device: 'smartphone', issue: 'screen', price: 3000 }] },
-      { name: 'Smart Repair Gujranwala',  address: 'Satellite Town',     city: 'Gujranwala',     phone: '055-4440002', location: { lat: 32.1950, lng: 74.2000 }, rating: 4.0, reviewCount: 76,  trustScore: 78, isFairPriceBadge: true,  specialties: ['smartphone'],                  priceRange: 'budget',  services: [{ device: 'smartphone', issue: 'battery', price: 1400 }] },
-      // Multan
-      { name: 'Multan Tech Repairs',      address: 'Hussain Agahi',      city: 'Multan',         phone: '061-5550001', location: { lat: 30.1575, lng: 71.5249 }, rating: 4.5, reviewCount: 167, trustScore: 91, isFairPriceBadge: true,  specialties: ['smartphone','laptop'],         priceRange: 'mid',     services: [{ device: 'smartphone', issue: 'screen', price: 3300 }, { device: 'laptop', issue: 'keyboard', price: 3500 }] },
-      { name: 'iCare Multan',             address: 'Gulgasht Colony',    city: 'Multan',         phone: '061-5550002', location: { lat: 30.1650, lng: 71.5150 }, rating: 4.2, reviewCount: 89,  trustScore: 83, isFairPriceBadge: true,  specialties: ['smartphone','tablet'],         priceRange: 'budget',  services: [{ device: 'smartphone', issue: 'battery', price: 1600 }] },
-      // Bahawalpur
-      { name: 'Bahawalpur Mobile Center', address: 'Model Town A',       city: 'Bahawalpur',     phone: '062-6660001', location: { lat: 29.3956, lng: 71.6836 }, rating: 4.1, reviewCount: 94,  trustScore: 82, isFairPriceBadge: true,  specialties: ['smartphone'],                  priceRange: 'mid',     services: [{ device: 'smartphone', issue: 'screen', price: 2800 }] },
-      { name: 'Tech World Bahawalpur',    address: 'Circular Road',      city: 'Bahawalpur',     phone: '062-6660002', location: { lat: 29.4000, lng: 71.6900 }, rating: 3.8, reviewCount: 52,  trustScore: 68, isFairPriceBadge: false, specialties: ['smartphone','laptop'],         priceRange: 'budget',  services: [{ device: 'laptop', issue: 'battery', price: 4000 }] },
-      // Sargodha
-      { name: 'Sargodha Repair Hub',      address: 'University Road',    city: 'Sargodha',       phone: '048-7770001', location: { lat: 32.0836, lng: 72.6711 }, rating: 4.3, reviewCount: 108, trustScore: 86, isFairPriceBadge: true,  specialties: ['smartphone','laptop'],         priceRange: 'mid',     services: [{ device: 'smartphone', issue: 'screen', price: 3100 }] },
-      // Sialkot
-      { name: 'Sialkot Tech Solutions',   address: 'Cantt Area',         city: 'Sialkot',        phone: '052-8880001', location: { lat: 32.4945, lng: 74.5229 }, rating: 4.6, reviewCount: 183, trustScore: 92, isFairPriceBadge: true,  specialties: ['smartphone','laptop','tablet'], priceRange: 'mid',     services: [{ device: 'smartphone', issue: 'screen', price: 3400 }, { device: 'laptop', issue: 'screen', price: 8500 }] },
-      { name: 'Mobile Expert Sialkot',    address: 'Paris Road',         city: 'Sialkot',        phone: '052-8880002', location: { lat: 32.5000, lng: 74.5300 }, rating: 4.0, reviewCount: 71,  trustScore: 77, isFairPriceBadge: true,  specialties: ['smartphone'],                  priceRange: 'budget',  services: [{ device: 'smartphone', issue: 'battery', price: 1700 }] },
-      // Sheikhupura
-      { name: 'Sheikhupura Mobile Fix',   address: 'Main Bazar',         city: 'Sheikhupura',    phone: '056-9990001', location: { lat: 31.7167, lng: 73.9850 }, rating: 4.0, reviewCount: 63,  trustScore: 79, isFairPriceBadge: true,  specialties: ['smartphone'],                  priceRange: 'budget',  services: [{ device: 'smartphone', issue: 'screen', price: 2700 }] },
-      // Jhang
-      { name: 'Jhang Gadget Care',        address: 'Clock Tower Chowk',  city: 'Jhang',          phone: '047-1010001', location: { lat: 31.2681, lng: 72.3181 }, rating: 3.9, reviewCount: 48,  trustScore: 72, isFairPriceBadge: false, specialties: ['smartphone'],                  priceRange: 'budget',  services: [{ device: 'smartphone', issue: 'screen', price: 2500 }] },
-      // Rahim Yar Khan
-      { name: 'RYK Mobile Repairs',       address: 'Saddar Road',        city: 'Rahim Yar Khan', phone: '068-1020001', location: { lat: 28.4202, lng: 70.2952 }, rating: 4.2, reviewCount: 87,  trustScore: 84, isFairPriceBadge: true,  specialties: ['smartphone','laptop'],         priceRange: 'mid',     services: [{ device: 'smartphone', issue: 'screen', price: 2900 }] },
-      // Gujrat
-      { name: 'Gujrat Tech Repair',       address: 'Jinnah Road',        city: 'Gujrat',         phone: '053-1030001', location: { lat: 32.5736, lng: 74.0790 }, rating: 4.1, reviewCount: 79,  trustScore: 80, isFairPriceBadge: true,  specialties: ['smartphone'],                  priceRange: 'mid',     services: [{ device: 'smartphone', issue: 'screen', price: 3000 }] },
-      // Kasur
-      { name: 'Kasur Mobile Center',      address: 'GT Road Kasur',      city: 'Kasur',          phone: '049-1040001', location: { lat: 31.1167, lng: 74.4500 }, rating: 3.8, reviewCount: 41,  trustScore: 69, isFairPriceBadge: false, specialties: ['smartphone'],                  priceRange: 'budget',  services: [{ device: 'smartphone', issue: 'battery', price: 1300 }] },
-      // Okara
-      { name: 'Okara Smart Repairs',      address: 'Cantt Bazar',        city: 'Okara',          phone: '044-1050001', location: { lat: 30.8138, lng: 73.4534 }, rating: 4.0, reviewCount: 55,  trustScore: 76, isFairPriceBadge: true,  specialties: ['smartphone'],                  priceRange: 'budget',  services: [{ device: 'smartphone', issue: 'screen', price: 2600 }] },
-      // Sahiwal
-      { name: 'Sahiwal Tech Hub',         address: 'Farid Town',         city: 'Sahiwal',        phone: '040-1060001', location: { lat: 30.6706, lng: 73.1064 }, rating: 4.2, reviewCount: 68,  trustScore: 82, isFairPriceBadge: true,  specialties: ['smartphone','laptop'],         priceRange: 'mid',     services: [{ device: 'smartphone', issue: 'screen', price: 2800 }] },
-      // Mianwali
-      { name: 'Mianwali Mobile Fix',      address: 'Circular Road',      city: 'Mianwali',       phone: '0459-107001', location: { lat: 32.5838, lng: 71.5432 }, rating: 3.9, reviewCount: 37,  trustScore: 71, isFairPriceBadge: false, specialties: ['smartphone'],                  priceRange: 'budget',  services: [{ device: 'smartphone', issue: 'screen', price: 2400 }] },
-      // Chiniot
-      { name: 'Chiniot Gadget Repair',    address: 'Bhawana Road',       city: 'Chiniot',        phone: '047-1080001', location: { lat: 31.7200, lng: 72.9800 }, rating: 4.0, reviewCount: 44,  trustScore: 75, isFairPriceBadge: true,  specialties: ['smartphone'],                  priceRange: 'budget',  services: [{ device: 'smartphone', issue: 'battery', price: 1400 }] },
-      // Hafizabad
-      { name: 'Hafizabad Mobile Care',    address: 'Main Bazar',         city: 'Hafizabad',      phone: '0547-109001', location: { lat: 32.0714, lng: 73.6881 }, rating: 3.8, reviewCount: 32,  trustScore: 67, isFairPriceBadge: false, specialties: ['smartphone'],                  priceRange: 'budget',  services: [{ device: 'smartphone', issue: 'screen', price: 2300 }] },
-      // Nankana Sahib
-      { name: 'Nankana Tech Repairs',     address: 'Gurdwara Road',      city: 'Nankana Sahib',  phone: '056-1100001', location: { lat: 31.4500, lng: 73.7100 }, rating: 4.1, reviewCount: 49,  trustScore: 78, isFairPriceBadge: true,  specialties: ['smartphone'],                  priceRange: 'budget',  services: [{ device: 'smartphone', issue: 'screen', price: 2500 }] },
-      // Narowal
-      { name: 'Narowal Mobile Hub',       address: 'Shakargarh Road',    city: 'Narowal',        phone: '0542-111001', location: { lat: 32.1000, lng: 74.8700 }, rating: 3.9, reviewCount: 38,  trustScore: 70, isFairPriceBadge: false, specialties: ['smartphone'],                  priceRange: 'budget',  services: [{ device: 'smartphone', issue: 'battery', price: 1300 }] },
-      // Pakpattan
-      { name: 'Pakpattan Smart Fix',      address: 'Darbar Road',        city: 'Pakpattan',      phone: '0457-112001', location: { lat: 30.3436, lng: 73.3872 }, rating: 4.0, reviewCount: 42,  trustScore: 74, isFairPriceBadge: true,  specialties: ['smartphone'],                  priceRange: 'budget',  services: [{ device: 'smartphone', issue: 'screen', price: 2400 }] },
-      // Toba Tek Singh
-      { name: 'TTS Mobile Repairs',       address: 'Faisalabad Road',    city: 'Toba Tek Singh', phone: '046-1130001', location: { lat: 30.9667, lng: 72.4833 }, rating: 4.1, reviewCount: 53,  trustScore: 77, isFairPriceBadge: true,  specialties: ['smartphone'],                  priceRange: 'budget',  services: [{ device: 'smartphone', issue: 'screen', price: 2600 }] },
-      // Vehari
-      { name: 'Vehari Tech Center',       address: 'Multan Road',        city: 'Vehari',         phone: '067-1140001', location: { lat: 30.0454, lng: 72.3519 }, rating: 3.9, reviewCount: 36,  trustScore: 69, isFairPriceBadge: false, specialties: ['smartphone'],                  priceRange: 'budget',  services: [{ device: 'smartphone', issue: 'battery', price: 1200 }] },
+      // Amritsar
+      { name: 'Golden City Mobile Repair',  address: 'Hall Bazar',          city: 'Amritsar',          district: 'Amritsar',                  phone: '0183-501001', location: { lat: 31.6340, lng: 74.8723 }, rating: 4.8, reviewCount: 312, trustScore: 96, isFairPriceBadge: true,  specialties: ['smartphone','laptop','tablet'], priceRange: 'mid',     services: [{ device: 'smartphone', issue: 'screen', price: 1800 }, { device: 'laptop', issue: 'screen', price: 5500 }] },
+      { name: 'iCare Amritsar',             address: 'Lawrence Road',        city: 'Amritsar',          district: 'Amritsar',                  phone: '0183-501002', location: { lat: 31.6280, lng: 74.8650 }, rating: 4.4, reviewCount: 178, trustScore: 87, isFairPriceBadge: true,  specialties: ['smartphone','tablet'],         priceRange: 'mid',     services: [{ device: 'smartphone', issue: 'battery', price: 800 }] },
+      { name: 'Quick Fix Amritsar',         address: 'Ranjit Avenue',        city: 'Amritsar',          district: 'Amritsar',                  phone: '0183-501003', location: { lat: 31.6400, lng: 74.8800 }, rating: 3.6, reviewCount: 72,  trustScore: 58, isFairPriceBadge: false, isFlagged: true, specialties: ['smartphone'], priceRange: 'premium', services: [{ device: 'smartphone', issue: 'screen', price: 3500 }] },
+      // Ludhiana
+      { name: 'Ludhiana Tech Hub',          address: 'Ferozepur Road',       city: 'Ludhiana',          district: 'Ludhiana',                  phone: '0161-502001', location: { lat: 30.9010, lng: 75.8573 }, rating: 4.6, reviewCount: 245, trustScore: 93, isFairPriceBadge: true,  specialties: ['smartphone','laptop'],         priceRange: 'mid',     services: [{ device: 'smartphone', issue: 'screen', price: 1700 }, { device: 'laptop', issue: 'battery', price: 3200 }] },
+      { name: 'Smart Repair Ludhiana',      address: 'Model Town',           city: 'Ludhiana',          district: 'Ludhiana',                  phone: '0161-502002', location: { lat: 30.9100, lng: 75.8400 }, rating: 4.2, reviewCount: 134, trustScore: 84, isFairPriceBadge: true,  specialties: ['smartphone'],                  priceRange: 'budget',  services: [{ device: 'smartphone', issue: 'battery', price: 700 }] },
+      { name: 'Mobile Zone Ludhiana',       address: 'Sarabha Nagar',        city: 'Ludhiana',          district: 'Ludhiana',                  phone: '0161-502003', location: { lat: 30.8950, lng: 75.8650 }, rating: 3.9, reviewCount: 88,  trustScore: 72, isFairPriceBadge: false, specialties: ['smartphone','laptop'],         priceRange: 'budget',  services: [{ device: 'laptop', issue: 'screen', price: 4800 }] },
+      // Jalandhar
+      { name: 'Jalandhar Gadget Care',      address: 'Nakodar Road',         city: 'Jalandhar',         district: 'Jalandhar',                 phone: '0181-503001', location: { lat: 31.3260, lng: 75.5762 }, rating: 4.5, reviewCount: 196, trustScore: 90, isFairPriceBadge: true,  specialties: ['smartphone','laptop','tablet'], priceRange: 'mid',     services: [{ device: 'smartphone', issue: 'screen', price: 1650 }, { device: 'tablet', issue: 'screen', price: 3000 }] },
+      { name: 'iRepair Jalandhar',          address: 'Model Town',           city: 'Jalandhar',         district: 'Jalandhar',                 phone: '0181-503002', location: { lat: 31.3350, lng: 75.5650 }, rating: 4.1, reviewCount: 109, trustScore: 81, isFairPriceBadge: true,  specialties: ['smartphone'],                  priceRange: 'budget',  services: [{ device: 'smartphone', issue: 'battery', price: 750 }] },
+      // Patiala
+      { name: 'Patiala Mobile Experts',     address: 'Leela Bhawan',         city: 'Patiala',           district: 'Patiala',                   phone: '0175-504001', location: { lat: 30.3398, lng: 76.3869 }, rating: 4.4, reviewCount: 167, trustScore: 88, isFairPriceBadge: true,  specialties: ['smartphone','laptop'],         priceRange: 'mid',     services: [{ device: 'smartphone', issue: 'screen', price: 1750 }] },
+      { name: 'Tech Fix Patiala',           address: 'New Lal Bagh',         city: 'Patiala',           district: 'Patiala',                   phone: '0175-504002', location: { lat: 30.3450, lng: 76.3800 }, rating: 3.8, reviewCount: 63,  trustScore: 67, isFairPriceBadge: false, specialties: ['smartphone'],                  priceRange: 'budget',  services: [{ device: 'smartphone', issue: 'charging_port', price: 450 }] },
+      // Bathinda
+      { name: 'Bathinda Smart Repairs',     address: 'Goniana Road',         city: 'Bathinda',          district: 'Bathinda',                  phone: '0164-505001', location: { lat: 30.2110, lng: 74.9455 }, rating: 4.3, reviewCount: 142, trustScore: 86, isFairPriceBadge: true,  specialties: ['smartphone','laptop'],         priceRange: 'mid',     services: [{ device: 'smartphone', issue: 'screen', price: 1600 }] },
+      { name: 'Mobile Care Bathinda',       address: 'Thermal Colony',       city: 'Bathinda',          district: 'Bathinda',                  phone: '0164-505002', location: { lat: 30.2200, lng: 74.9500 }, rating: 4.0, reviewCount: 87,  trustScore: 78, isFairPriceBadge: true,  specialties: ['smartphone'],                  priceRange: 'budget',  services: [{ device: 'smartphone', issue: 'battery', price: 700 }] },
+      // Mohali (SAS Nagar)
+      { name: 'Mohali Tech Solutions',      address: 'Phase 7',              city: 'Mohali',            district: 'Mohali (SAS Nagar)',         phone: '0172-506001', location: { lat: 30.7046, lng: 76.7179 }, rating: 4.7, reviewCount: 289, trustScore: 95, isFairPriceBadge: true,  specialties: ['smartphone','laptop','tablet'], priceRange: 'mid',     services: [{ device: 'smartphone', issue: 'screen', price: 1900 }, { device: 'laptop', issue: 'screen', price: 6000 }] },
+      { name: 'iZone Mohali',               address: 'Sector 70',            city: 'Mohali',            district: 'Mohali (SAS Nagar)',         phone: '0172-506002', location: { lat: 30.7100, lng: 76.7250 }, rating: 4.5, reviewCount: 201, trustScore: 91, isFairPriceBadge: true,  specialties: ['smartphone','laptop'],         priceRange: 'mid',     services: [{ device: 'laptop', issue: 'battery', price: 3500 }] },
+      // Hoshiarpur
+      { name: 'Hoshiarpur Mobile Fix',      address: 'Sutheri Road',         city: 'Hoshiarpur',        district: 'Hoshiarpur',                phone: '01882-507001',location: { lat: 31.5143, lng: 75.9115 }, rating: 4.1, reviewCount: 98,  trustScore: 80, isFairPriceBadge: true,  specialties: ['smartphone'],                  priceRange: 'budget',  services: [{ device: 'smartphone', issue: 'screen', price: 1500 }] },
+      // Gurdaspur
+      { name: 'Gurdaspur Gadget Repair',    address: 'Dalhousie Road',       city: 'Gurdaspur',         district: 'Gurdaspur',                 phone: '01874-508001',location: { lat: 32.0396, lng: 75.4058 }, rating: 4.0, reviewCount: 74,  trustScore: 76, isFairPriceBadge: true,  specialties: ['smartphone'],                  priceRange: 'budget',  services: [{ device: 'smartphone', issue: 'battery', price: 700 }] },
+      // Pathankot
+      { name: 'Pathankot Tech Repairs',     address: 'Dhar Road',            city: 'Pathankot',         district: 'Pathankot',                 phone: '0186-509001', location: { lat: 32.2643, lng: 75.6421 }, rating: 4.2, reviewCount: 112, trustScore: 83, isFairPriceBadge: true,  specialties: ['smartphone','laptop'],         priceRange: 'mid',     services: [{ device: 'smartphone', issue: 'screen', price: 1600 }] },
+      // Firozpur
+      { name: 'Firozpur Mobile Center',     address: 'GT Road',              city: 'Firozpur',          district: 'Firozpur',                  phone: '01632-510001',location: { lat: 30.9254, lng: 74.6099 }, rating: 3.9, reviewCount: 56,  trustScore: 70, isFairPriceBadge: false, specialties: ['smartphone'],                  priceRange: 'budget',  services: [{ device: 'smartphone', issue: 'screen', price: 1400 }] },
+      // Moga
+      { name: 'Moga Smart Fix',             address: 'Ferozepur Road',       city: 'Moga',              district: 'Moga',                      phone: '01636-511001',location: { lat: 30.8170, lng: 75.1683 }, rating: 4.1, reviewCount: 83,  trustScore: 79, isFairPriceBadge: true,  specialties: ['smartphone'],                  priceRange: 'budget',  services: [{ device: 'smartphone', issue: 'battery', price: 700 }] },
+      // Barnala
+      { name: 'Barnala Mobile Repairs',     address: 'Sangrur Road',         city: 'Barnala',           district: 'Barnala',                   phone: '01679-512001',location: { lat: 30.3780, lng: 75.5490 }, rating: 3.8, reviewCount: 47,  trustScore: 68, isFairPriceBadge: false, specialties: ['smartphone'],                  priceRange: 'budget',  services: [{ device: 'smartphone', issue: 'screen', price: 1350 }] },
+      // Sangrur
+      { name: 'Sangrur Tech Hub',           address: 'Patiala Road',         city: 'Sangrur',           district: 'Sangrur',                   phone: '01672-513001',location: { lat: 30.2453, lng: 75.8441 }, rating: 4.2, reviewCount: 91,  trustScore: 82, isFairPriceBadge: true,  specialties: ['smartphone','laptop'],         priceRange: 'mid',     services: [{ device: 'smartphone', issue: 'screen', price: 1550 }] },
+      // Kapurthala
+      { name: 'Kapurthala Gadget Care',     address: 'Jalandhar Road',       city: 'Kapurthala',        district: 'Kapurthala',                phone: '01822-514001',location: { lat: 31.3808, lng: 75.3800 }, rating: 4.0, reviewCount: 65,  trustScore: 75, isFairPriceBadge: true,  specialties: ['smartphone'],                  priceRange: 'budget',  services: [{ device: 'smartphone', issue: 'battery', price: 700 }] },
+      // Faridkot
+      { name: 'Faridkot Mobile Fix',        address: 'Kotkapura Road',       city: 'Faridkot',          district: 'Faridkot',                  phone: '01639-515001',location: { lat: 30.6740, lng: 74.7570 }, rating: 3.9, reviewCount: 52,  trustScore: 71, isFairPriceBadge: false, specialties: ['smartphone'],                  priceRange: 'budget',  services: [{ device: 'smartphone', issue: 'screen', price: 1400 }] },
+      // Fatehgarh Sahib
+      { name: 'Fatehgarh Sahib Tech',       address: 'Sirhind Road',         city: 'Fatehgarh Sahib',   district: 'Fatehgarh Sahib',           phone: '01763-516001',location: { lat: 30.6490, lng: 76.3910 }, rating: 4.1, reviewCount: 69,  trustScore: 78, isFairPriceBadge: true,  specialties: ['smartphone'],                  priceRange: 'budget',  services: [{ device: 'smartphone', issue: 'battery', price: 700 }] },
+      // Rupnagar (Ropar)
+      { name: 'Rupnagar Smart Repairs',     address: 'Chandigarh Road',      city: 'Rupnagar',          district: 'Rupnagar (Ropar)',           phone: '01881-517001',location: { lat: 30.9644, lng: 76.5254 }, rating: 4.3, reviewCount: 104, trustScore: 85, isFairPriceBadge: true,  specialties: ['smartphone','laptop'],         priceRange: 'mid',     services: [{ device: 'smartphone', issue: 'screen', price: 1600 }] },
+      // Mansa
+      { name: 'Mansa Mobile Center',        address: 'Bathinda Road',        city: 'Mansa',             district: 'Mansa',                     phone: '01652-518001',location: { lat: 29.9882, lng: 75.3974 }, rating: 3.8, reviewCount: 44,  trustScore: 66, isFairPriceBadge: false, specialties: ['smartphone'],                  priceRange: 'budget',  services: [{ device: 'smartphone', issue: 'screen', price: 1300 }] },
+      // Nawanshahr (SBS Nagar)
+      { name: 'Nawanshahr Tech Repairs',    address: 'Hoshiarpur Road',      city: 'Nawanshahr',        district: 'Nawanshahr (Shaheed Bhagat Singh Nagar)', phone: '01823-519001', location: { lat: 31.1250, lng: 76.1160 }, rating: 4.0, reviewCount: 58, trustScore: 74, isFairPriceBadge: true, specialties: ['smartphone'], priceRange: 'budget', services: [{ device: 'smartphone', issue: 'battery', price: 700 }] },
+      // Tarn Taran
+      { name: 'Tarn Taran Mobile Fix',      address: 'Amritsar Road',        city: 'Tarn Taran',        district: 'Tarn Taran',                phone: '01852-520001',location: { lat: 31.4519, lng: 74.9270 }, rating: 4.1, reviewCount: 76,  trustScore: 77, isFairPriceBadge: true,  specialties: ['smartphone'],                  priceRange: 'budget',  services: [{ device: 'smartphone', issue: 'screen', price: 1450 }] },
+      // Malerkotla
+      { name: 'Malerkotla Smart Fix',       address: 'Ludhiana Road',        city: 'Malerkotla',        district: 'Malerkotla',                phone: '01675-521001',location: { lat: 30.5310, lng: 75.8790 }, rating: 4.0, reviewCount: 61,  trustScore: 75, isFairPriceBadge: true,  specialties: ['smartphone'],                  priceRange: 'budget',  services: [{ device: 'smartphone', issue: 'battery', price: 700 }] },
     ];
     await Shop.insertMany(shops);
-    res.json({ message: `${shops.length} Punjab shops seeded successfully` });
+    res.json({ message: `${shops.length} Punjab (India) shops seeded successfully` });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

@@ -25,7 +25,7 @@ export default function ShopCard({ shop }) {
           <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 5, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{shop.name}</h3>
           <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--text2)' }}>
             <MapPin size={12} />
-            <span>{shop.city}</span>
+            <span>{shop.district || shop.city}</span>
             {shop.distance != null && (
               <span style={{ marginLeft: 4, color: 'var(--accent)', fontWeight: 700 }}>· {shop.distance} km</span>
             )}
