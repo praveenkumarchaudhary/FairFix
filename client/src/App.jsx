@@ -11,6 +11,7 @@ import ShopDetail from './pages/ShopDetail';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 import Complaints from './pages/Complaints';
+import AIFeatures from './pages/AIFeatures';
 
 export default function App() {
   return (
@@ -27,6 +28,7 @@ export default function App() {
               <Route path="/login" element={<Login />} />
               <Route path="/signup" element={<Signup />} />
               <Route path="/complaints" element={<Complaints />} />
+              <Route path="/ai" element={<AIFeatures />} />
             </Routes>
           </main>
           <Toaster

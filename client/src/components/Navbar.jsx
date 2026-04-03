@@ -27,6 +27,7 @@ export default function Navbar() {
     { to: '/predict', label: 'Price Check' },
     { to: '/shops', label: 'Find Shops' },
     { to: '/complaints', label: 'Complaints' },
+    { to: '/ai', label: '🤖 AI Features' },
   ];
 
   const isActive = (path) => location.pathname === path;
