@@ -10,6 +10,7 @@ import ShopFinder from './pages/ShopFinder';
 import ShopDetail from './pages/ShopDetail';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
+import Complaints from './pages/Complaints';
 
 export default function App() {
   return (
@@ -25,6 +26,7 @@ export default function App() {
               <Route path="/shop/:id" element={<ShopDetail />} />
               <Route path="/login" element={<Login />} />
               <Route path="/signup" element={<Signup />} />
+              <Route path="/complaints" element={<Complaints />} />
             </Routes>
           </main>
           <Toaster
